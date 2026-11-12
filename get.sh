@@ -2,13 +2,13 @@
 #
 # get.sh — 一行安装入口
 #
-#   curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/get.sh | sudo bash -s -- -y
+#   curl -fsSL https://raw.githubusercontent.com/SteveZMTstudios/arcvm-kernelsu/main/get.sh | sudo bash -s -- -y
 #
 # 做的事：把 fetch/install 脚本下载到临时目录，然后原样把参数交给
 # fetch-arcvm-kernelsu.sh。不会在系统里留下脚本文件。
 #
 # 环境变量：
-#   REPO     GitHub 仓库（默认 OWNER/REPO）
+#   REPO     GitHub 仓库（默认 SteveZMTstudios/arcvm-kernelsu）
 #   BRANCH   分支（默认 main）
 #   RAW_BASE 覆盖 raw 地址前缀（镜像/自建）
 
@@ -18,7 +18,7 @@ RED=$'\e[1;31m'
 BLUE=$'\e[1;34m'
 RESET=$'\e[0m'
 
-REPO=${REPO:-OWNER/REPO}
+REPO=${REPO:-SteveZMTstudios/arcvm-kernelsu}
 BRANCH=${BRANCH:-main}
 RAW_BASE=${RAW_BASE:-https://raw.githubusercontent.com/$REPO/$BRANCH}
 

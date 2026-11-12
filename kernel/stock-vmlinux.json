@@ -1,6 +1,6 @@
 {
   "5.10.252-1009564-ged76cab4c76e/x86_64": {
-    "url": "https://github.com/OWNER/REPO/releases/download/stock-vmlinux-5.10.252/vmlinux.original",
+    "url": "https://github.com/SteveZMTstudios/arcvm-kernelsu/releases/download/stock-vmlinux-5.10.252/vmlinux.original",
     "md5": "2d6183844cbdce9b3d35feeb25218a0d"
   }
 }

@@ -5,10 +5,10 @@
 # 依赖：curl、md5sum（ChromeOS 自带，不需要 python3/jq）
 #
 # 用法：
-#   sudo bash fetch-arcvm-kernelsu.sh --repo OWNER/REPO
-#   sudo bash fetch-arcvm-kernelsu.sh --repo OWNER/REPO -y
-#   sudo bash fetch-arcvm-kernelsu.sh --repo OWNER/REPO --release-tag latest-5.10.252-...-x86_64
-#   sudo bash fetch-arcvm-kernelsu.sh --repo OWNER/REPO --persistent
+#   sudo bash fetch-arcvm-kernelsu.sh --repo SteveZMTstudios/arcvm-kernelsu
+#   sudo bash fetch-arcvm-kernelsu.sh --repo SteveZMTstudios/arcvm-kernelsu -y
+#   sudo bash fetch-arcvm-kernelsu.sh --repo SteveZMTstudios/arcvm-kernelsu --release-tag latest-5.10.252-...-x86_64
+#   sudo bash fetch-arcvm-kernelsu.sh --repo SteveZMTstudios/arcvm-kernelsu --persistent
 #   sudo bash fetch-arcvm-kernelsu.sh --restore
 #   sudo bash fetch-arcvm-kernelsu.sh --restore --purge
 #
@@ -30,7 +30,7 @@ GREEN=$'\e[1;32m'
 BLUE=$'\e[1;34m'
 RESET=$'\e[0m'
 
-REPO=${REPO:-OWNER/REPO}
+REPO=${REPO:-SteveZMTstudios/arcvm-kernelsu}
 VMLINUX=${VMLINUX:-/opt/google/vms/android/vmlinux}
 BACKUP=${BACKUP:-/opt/google/vms/android/vmlinux.original}
 RELEASE_TAG=
@@ -80,7 +80,7 @@ if $RESTORE; then
 fi
 
 [ "$(id -u)" -eq 0 ] || die "请使用 root 运行（crosh 里先 sudo -i）。"
-[ -n "$REPO" ] && [ "$REPO" != "OWNER/REPO" ] || die "请用 --repo OWNER/REPO 指定仓库。"
+[ -n "$REPO" ] || die "请用 --repo SteveZMTstudios/arcvm-kernelsu 指定仓库。"
 
 read_kernel_version() {
     local f=$1 magic kv_off abs raw
