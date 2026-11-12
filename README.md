@@ -24,7 +24,7 @@
 一条命令（设备端，root）：
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/get.sh | sudo bash -s -- -y
+curl -fsSL https://raw.githubusercontent.com/SteveZMTstudios/arcvm-kernelsu/main/get.sh | sudo bash -s -- -y
 ```
 
 脚本会读取本机内核版本，下载完全匹配的 `vmlinux`，校验 md5 后替换。
@@ -33,19 +33,19 @@ curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/get.sh | sudo bash 
 ChromeOS 更新后自动跟随（写入 Brunch stateful bootscripts，版本一致时不做任何事）：
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/get.sh | sudo bash -s -- -y --persistent
+curl -fsSL https://raw.githubusercontent.com/SteveZMTstudios/arcvm-kernelsu/main/get.sh | sudo bash -s -- -y --persistent
 ```
 
 恢复原厂内核：
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/get.sh | sudo bash -s -- --restore
+curl -fsSL https://raw.githubusercontent.com/SteveZMTstudios/arcvm-kernelsu/main/get.sh | sudo bash -s -- --restore
 ```
 
 不带参数直接运行会交互式确认：
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/get.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/SteveZMTstudios/arcvm-kernelsu/main/get.sh | sudo bash
 ```
 
 ## 工作原理
@@ -122,4 +122,4 @@ NOTES.md                            # 实测数据与排查记录
 
 ## License
 
-内核源码与 KernelSU 遵循其原始许可证（GPL-2.0 等）。本仓库脚本按 GPL-2.0 发布。
+内核源码与 KernelSU 遵循其原始许可证（GPL-3.0 等）。本仓库脚本按 (GPL-3.0)[LICENSE] 发布。

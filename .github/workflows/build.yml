@@ -91,26 +91,35 @@ jobs:
               fi
             done
           done
-          rustup target add x86_64-unknown-linux-musl aarch64-unknown-linux-musl || true
 
-      - name: Clone ChromeOS ARCVM kernel
+      - name: Install Rust
+        if: steps.exists.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+            sh -s -- -y --profile minimal --default-toolchain stable
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+          "$HOME/.cargo/bin/rustup" target add x86_64-unknown-linux-musl aarch64-unknown-linux-musl || true
+
+      - name: Fetch kernel source
         if: steps.exists.outputs.skip != 'true'
         env:
           BRANCH: ${{ inputs.kernel_branch }}
           COMMIT: ${{ steps.cfg.outputs.commit }}
         run: |
           set -euo pipefail
-          git clone --filter=blob:none --no-checkout \
-            -b "$BRANCH" --depth=1 \
-            https://chromium.googlesource.com/chromiumos/third_party/kernel.git kernel-src
-          cd kernel-src
+          BASE=https://chromium.googlesource.com/chromiumos/third_party/kernel
           if [ -n "$COMMIT" ]; then
-            git fetch --depth=1 origin "$COMMIT"
-            git checkout --detach FETCH_HEAD
+            sha=$(curl -fsSL "$BASE/+log/$COMMIT?format=JSON&n=1" | tail -c +5 \
+              | python3 -c 'import sys,json; print(json.load(sys.stdin)["log"][0]["commit"])')
           else
-            git checkout --detach FETCH_HEAD || git checkout --detach "$BRANCH"
+            sha=$(git ls-remote "$BASE.git" "refs/heads/$BRANCH" | cut -f1)
           fi
-          git log -1 --oneline
+          echo "kernel commit: $sha"
+          curl -fsSL --retry 3 -o kernel.tar.gz "$BASE/+archive/$sha.tar.gz"
+          mkdir -p kernel-src
+          tar -xzf kernel.tar.gz -C kernel-src
+          ls kernel-src/arch/x86/configs/ | grep arcvm
 
       - name: Generate kernel config
         if: steps.exists.outputs.skip != 'true'
@@ -119,11 +128,12 @@ jobs:
           DEFCONFIG: ${{ steps.cfg.outputs.defconfig }}
         run: |
           set -euo pipefail
+          FRAGMENT="$PWD/kernel/arcvm-fragment.config"
           cd kernel-src
           make LLVM=1 ARCH="$ARCH" "$DEFCONFIG"
           while read -r opt; do
             case "$opt" in CONFIG_*=y|CONFIG_*=m) ./scripts/config --file .config -e "${opt%%=*}" ;; esac
-          done < "$GITHUB_WORKSPACE/kernel/arcvm-fragment.config"
+          done < "$FRAGMENT"
           make LLVM=1 ARCH="$ARCH" olddefconfig
           cp .config "$RUNNER_TEMP/kernel.config"
           grep -E '^CONFIG_SERIAL_8250_CONSOLE|^CONFIG_LOCALVERSION' "$RUNNER_TEMP/kernel.config"
@@ -137,6 +147,7 @@ jobs:
           KSU_MODE: lkm
         run: |
           set -euo pipefail
+          export PATH="$HOME/.cargo/bin:$PATH"
           chmod +x scripts/*.sh
           ./scripts/build-arcvm-kernelsu-vmlinux.sh \
             --kernel-version "$REL" \
@@ -145,7 +156,7 @@ jobs:
             --ksu-tag "$KSU_TAG" \
             --arch "$ARCH" \
             --work "$RUNNER_TEMP/build" \
-            --out dist
+            --out "$PWD/dist"
 
       - name: Checksums
         if: steps.exists.outputs.skip != 'true'

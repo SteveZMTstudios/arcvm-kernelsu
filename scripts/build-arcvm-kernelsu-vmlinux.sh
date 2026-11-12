@@ -126,6 +126,8 @@ for c in curl tar gzip gcc make python3; do
     command -v "$c" >/dev/null 2>&1 || die "缺少命令: $c"
 done
 mkdir -p "$WORK" "$OUT"
+WORK=$(cd "$WORK" && pwd)
+OUT=$(cd "$OUT" && pwd)
 
 read_kernel_version() {
     local f=$1 magic kv_off abs raw
@@ -277,6 +279,7 @@ chmod 755 "$INITRAMFS"/{dev,proc,sys,tmp}
 
 cd "$KSRC"
 CONFIG="$KSRC/.config"
+: > "$KSRC/.scmversion"
 
 "$KSRC/scripts/config" --file "$CONFIG" --set-str INITRAMFS_SOURCE "$INITRAMFS"
 "$KSRC/scripts/config" --file "$CONFIG" --set-str LOCALVERSION "$LOCALVERSION_SUFFIX"
@@ -330,7 +333,7 @@ else
 fi
 REL=$(make -s LLVM=1 ARCH="$ARCH" kernelrelease 2>/dev/null || true)
 info "内核 release: $REL"
-[ "$REL" = "$KVERSION" ] || warn "内核 release ($REL) 与 stock ($KVERSION) 不一致；vendor 模块可能加载失败。"
+[ "$REL" = "$KVERSION" ] || die "内核 release ($REL) 与目标 ($KVERSION) 不一致；vermagic 会不匹配。"
 
 PKG="bzImage"
 [ "$ARCH" = "arm64" ] && PKG="Image"

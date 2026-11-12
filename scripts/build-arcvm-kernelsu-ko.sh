@@ -130,6 +130,8 @@ for c in curl tar make gzip gcc clang ld.lld llvm-ar llvm-strip flex bison bc py
 done
 
 mkdir -p "$WORK" "$OUT"
+WORK=$(cd "$WORK" && pwd)
+OUT=$(cd "$OUT" && pwd)
 
 # ---------------------------------------------------------------- 版本/架构
 
@@ -277,6 +279,10 @@ ok "补丁已应用"
 
 info "准备内核构建树（olddefconfig + modules_prepare）..."
 cd "$KSRC"
+# 源码树位于外层 git 仓库里（CI 的 kernel-src）或从 tar 解压而来时，
+# setlocalversion 会把树判成 dirty 并追加 "+"，导致 vermagic 与 stock 不一致。
+# 空 .scmversion 让 setlocalversion 直接返回空。
+: > "$KSRC/.scmversion"
 cp "$CONFIG" .config
 make LLVM=1 ARCH="$ARCH" olddefconfig >"$WORK/prepare.log" 2>&1
 # 让模块的 vermagic 与目标内核完全一致（包括 -1009564-g... 后缀）
