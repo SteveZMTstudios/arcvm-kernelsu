@@ -1,0 +1,4 @@
+dist/
+stock-vmlinux
+*.log
+*.img
