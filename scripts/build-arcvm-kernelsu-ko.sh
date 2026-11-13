@@ -182,6 +182,10 @@ LOCALVERSION_SUFFIX=${KVERSION#"$KBASE"}
 KCOMMIT=$(printf '%s' "$KVERSION" | sed -n 's/.*-g\([0-9a-f]\{7,\}\).*/\1/p')
 [ -n "$KCOMMIT" ] || die "无法从 \"$KVERSION\" 解析 commit；请用 --kernel-tar 指定源码。"
 detect_arch
+# arm64 用 LLVM=1 交叉编译时必须给出 target triple，否则 clang 会按宿主机 x86_64 编译
+if [ "$ARCH" = "arm64" ]; then
+    export CROSS_COMPILE=${CROSS_COMPILE:-aarch64-linux-gnu-}
+fi
 
 info "内核版本: $KVERSION"
 info "内核 commit: $KCOMMIT"

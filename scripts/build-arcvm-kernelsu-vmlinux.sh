@@ -172,6 +172,10 @@ else
 fi
 
 KSRC=${KERNEL_SRC:-$WORK/kernel-$KCOMMIT}
+# arm64 用 LLVM=1 交叉编译时必须给出 target triple
+if [ "$ARCH" = "arm64" ]; then
+    export CROSS_COMPILE=${CROSS_COMPILE:-aarch64-linux-gnu-}
+fi
 info "内核版本: $KVERSION"
 info "内核 commit: $KCOMMIT"
 info "架构: $ARCH（KernelSU 资产: $KSU_ARCH）"
