@@ -83,7 +83,9 @@ check_patches() {
     local missing=0
     grep -Fq 'init is /init.real' "$INIT_RS" || { warn "ksuinit init.rs 未打补丁"; missing=1; }
     grep -Fq 'execve(cstr!("/init.real")' "$MAIN_RS" || { warn "ksuinit main.rs 未打补丁"; missing=1; }
-    grep -Fq 'my_do_syscall_64(unsigned long nr, struct pt_regs *regs)' "$X86HOOK_C" || { warn "x86 do_syscall_64 签名未修正"; missing=1; }
+    if [ "$ARCH_OVERRIDE" != "arm64" ]; then
+        grep -Fq 'my_do_syscall_64(unsigned long nr, struct pt_regs *regs)' "$X86HOOK_C" || { warn "x86 do_syscall_64 签名未修正"; missing=1; }
+    fi
     grep -Fq 'pr_debug("tp_marker: unmark process' "$TPMARKER_C" || { warn "tp_marker.c 逐线程日志未降级"; missing=1; }
     [ "$missing" -eq 0 ]
 }
@@ -124,8 +126,11 @@ PY
     grep -Fq 'init is /init.real' "$INIT_RS" || die "ksuinit init.rs 补丁失败。"
     grep -Fq 'execve(cstr!("/init.real")' "$MAIN_RS" || die "ksuinit main.rs 补丁失败。"
 
-    info "补丁 2/3: hook/x86_64/syscall_hook.c（do_syscall_64 参数顺序）"
-    python3 - "$X86HOOK_C" <<'PY'
+    if [ "$ARCH_OVERRIDE" = "arm64" ]; then
+        info "补丁 2/3: 跳过 x86_64 syscall hook（arm64 用 syscallno dispatcher，无需内核补丁）"
+    else
+        info "补丁 2/3: hook/x86_64/syscall_hook.c（do_syscall_64 参数顺序）"
+        python3 - "$X86HOOK_C" <<'PY'
 import pathlib, sys
 p = pathlib.Path(sys.argv[1])
 s = p.read_text()
@@ -140,7 +145,8 @@ if "my_do_syscall_64(unsigned long nr, struct pt_regs *regs)" not in s:
     s = s.replace(old, new, 1)
 p.write_text(s)
 PY
-    grep -Fq 'my_do_syscall_64(unsigned long nr, struct pt_regs *regs)' "$X86HOOK_C" || die "x86 syscall hook 补丁失败。"
+        grep -Fq 'my_do_syscall_64(unsigned long nr, struct pt_regs *regs)' "$X86HOOK_C" || die "x86 syscall hook 补丁失败。"
+    fi
 
     info "补丁 3/3: hook/tp_marker.c（逐线程 printk 降为 pr_debug）"
     python3 - "$TPMARKER_C" <<'PY'

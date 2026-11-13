@@ -277,7 +277,7 @@ fi
 info "应用 ARCVM 兼容补丁..."
 KO_SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 [ -f "$KO_SCRIPT_DIR/patch_android.sh" ] || die "找不到 patch_android.sh（应与本脚本同目录）。"
-bash "$KO_SCRIPT_DIR/patch_android.sh" --ksu-src "$KSUSRC"
+bash "$KO_SCRIPT_DIR/patch_android.sh" --ksu-src "$KSUSRC" --arch "$ARCH"
 ok "补丁已应用"
 
 # ---------------------------------------------------------------- 编译
