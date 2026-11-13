@@ -334,6 +334,10 @@ case "$ARCH" in
     *) die "不支持的 Rust 目标架构: $ARCH" ;;
 esac
 RUST_TARGET="${RUST_ARCH}-unknown-linux-musl"
+# 交叉编译 aarch64 musl 时不能用宿主机 cc（x86_64 的 ld 不认识 aarch64 链接选项）
+if [ "$ARCH" = "arm64" ]; then
+    export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER=${CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER:-aarch64-linux-gnu-gcc}
+fi
 rustup target add "$RUST_TARGET" 2>&1 | tee "$WORK/rust-target.log" || {
     tail -20 "$WORK/rust-target.log" >&2
     die "无法安装 Rust target: $RUST_TARGET"
