@@ -377,5 +377,5 @@ info "内核: $KVERSION / $ARCH"
 info "KernelSU: $KSU_TAG（ko 内嵌在 initramfs）"
 echo
 info "在 ChromeOS 上安装（只替换 vmlinux）："
-printf '  sudo bash install-arcvm-kernelsu.sh --kernel-file %s\n' "$OUTFILE"
+printf '  sudo bash install.sh --kernel-file %s\n' "$OUTFILE"
 warn "KernelSU 升级需要重新构建并刷 vmlinux；system.raw.img 不会被改动。"

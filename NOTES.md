@@ -86,11 +86,19 @@ CI 不需要 stock vmlinux：按 `uname -r` 里的 commit 检出
 （`CONFIG_CLANG_VERSION`、`CONFIG_BUILD_SALT`、`CONFIG_EXTRA_FIRMWARE`）。
 `CONFIG_EXTRA_FIRMWARE`（stock 的 amdgpu 固件）在 ARCVM 上用不到，未补。
 
-流程：
+release 按 KMI 滚动，不按精确 `uname -r`：
 
-1. workflow_dispatch 填 `kernel_version`（设备 `uname -r`）和 `arch`；
-2. CI 构建 `latest-<版本>-<架构>` / `build-<ksu>-<版本>-<架构>`；
-3. 设备端 `fetch-arcvm-kernelsu.sh` 只下载版本完全匹配的产物。
+1. workflow_dispatch 的 `kernel_version` 可空（跟随分支 tip），也可填 commit
+   或完整 release 来固定源码；`arch` 选 `both` / 单架构；
+2. CI 构建 `latest-<KMI>-<架构>`（滚动）和 `build-<ksu>-<版本>-<架构>`（不可变），
+   资产名 `vmlinux-<KMI>-<架构>`；
+3. 设备端 `install.sh` 从本机内核取 major.minor，下载 `latest-<KMI>-<架构>`，
+   再校验产物的 major.minor 与本机一致。
+
+只按 KMI 匹配的理由：stock ARCVM 内核的 `=m` 模块在启动路径上不加载，
+vermagic 后缀差异不影响启动；同一 ACK 5.10 分支 + `*_arcvm_defconfig`
+就足够覆盖同 KMI 的 ChromeOS 版本。`build-<ksu>-<版本>-<架构>` 保留精确版本，
+需要逐字节复刻时用 `--release-tag` 指定。
 
 `kernel/stock-vmlinux.json` 仍保留，用于“要 100% 复刻 stock config”的可选本地
 构建路径（`build-arcvm-kernelsu-vmlinux.sh --vmlinux ...`）。

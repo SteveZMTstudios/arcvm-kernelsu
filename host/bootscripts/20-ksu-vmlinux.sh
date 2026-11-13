@@ -45,8 +45,16 @@ if [ -n "${ksu_md5:-}" ] && [ "$cur_md5" = "${ksu_md5}" ]; then
     exit 0
 fi
 
+kmi() { printf '%s' "${1%%-*}" | cut -d. -f1,2; }
+
 cur_ver=$(read_version "$TARGET" || true)
-if [ -n "${stock_version:-}" ] && [ "$cur_ver" != "${stock_version}" ]; then
+# 按 KMI（major.minor）判断是否还能重放；同一 KMI 内的补丁升级不影响。
+if [ -n "${ksu_kmi:-}" ]; then
+    if [ -z "$cur_ver" ] || [ "$(kmi "$cur_ver")" != "$ksu_kmi" ]; then
+        log "ARCVM KMI changed: current=$cur_ver expected=$ksu_kmi; skip (rebuild KSU vmlinux)"
+        exit 0
+    fi
+elif [ -n "${stock_version:-}" ] && [ "$cur_ver" != "${stock_version}" ]; then
     log "ARCVM kernel changed: current=$cur_ver expected=$stock_version; skip (rebuild KSU vmlinux)"
     exit 0
 fi

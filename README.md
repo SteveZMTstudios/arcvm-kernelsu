@@ -17,35 +17,48 @@
 一条命令（设备端，root）：
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/SteveZMTstudios/arcvm-kernelsu/main/get.sh | sudo bash -s -- -y
+curl -fsSL https://stevezmt.top/arcvm-kernelsu/install.sh | sudo bash -s -- -y
 ```
 
-脚本会自己读出你机器上的内核版本，去下载完全对得上的那个 `vmlinux`，校验一遍 md5，然后替换掉。第一次安装时会把原厂内核备份成 `vmlinux.original`。
-
-如果你希望 ChromeOS 之后自动更新了也能自己跟上，就多加一个 `--persistent`。它会往 Brunch 的 bootscripts 里塞一个开机脚本，每次开机检查版本，对得上就什么都不做，对不上才重新装：
+GitHub 直连也可以，脚本是同一个：
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/SteveZMTstudios/arcvm-kernelsu/main/get.sh | sudo bash -s -- -y --persistent
+curl -fsSL https://raw.githubusercontent.com/SteveZMTstudios/arcvm-kernelsu/main/install.sh | sudo bash -s -- -y
+```
+
+安装器只有一个文件，不会再去下载别的脚本。它会读出你机器上的内核 KMI（比如 `5.10`），下载对应的 `vmlinux-5.10-<架构>`，校验 md5 和内嵌版本，然后替换掉。第一次安装时会把原厂内核备份成 `vmlinux.original`。
+
+如果你希望 ChromeOS 更新后也能自己跟上，就多加一个 `--persistent`。它会往 Brunch 的 bootscripts 里塞一个开机脚本，每次开机检查 KMI，对得上就什么都不做，KMI 变了才跳过：
+
+```sh
+curl -fsSL https://stevezmt.top/arcvm-kernelsu/install.sh | sudo bash -s -- -y --persistent
 ```
 
 恢复原厂内核：
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/SteveZMTstudios/arcvm-kernelsu/main/get.sh | sudo bash -s -- --restore
+curl -fsSL https://stevezmt.top/arcvm-kernelsu/install.sh | sudo bash -s -- --restore
 ```
 
 不带参数直接运行会交互式确认：
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/SteveZMTstudios/arcvm-kernelsu/main/get.sh | sudo bash
+curl -fsSL https://stevezmt.top/arcvm-kernelsu/install.sh | sudo bash
+```
+
+镜像/自建资产站：用 `REPO`、`ASSET_BASE` 覆盖，多个前缀空格分隔，GitHub 始终兜底。
+
+```sh
+curl -fsSL https://stevezmt.top/arcvm-kernelsu/install.sh | \
+  sudo ASSET_BASE=https://mirror.example.com/arcvm bash -s -- -y
 ```
 
 ## 特性
 
 - **LKM 模式**：KernelSU 以模块形式加载，内核本体保持 stock ARCVM 配置；
-- **版本匹配**：每个产物绑定 `(内核 release, 架构)`，不会刷错版本；
+- **KMI 匹配**：产物按 `(KMI, 架构)` 发布，同一 `5.10` 内所有 ChromeOS 版本通用；
 - **一条命令**：设备端只需在 crosh 里执行一次，不需要 SSH；
-- **可选自动跟随**：Brunch bootscript 在 ChromeOS 更新后自动重装；
+- **可选自动跟随**：Brunch bootscript 在 ChromeOS 更新后自动重放；
 - **x86_64 / arm64** 同一套脚本。
 
 ## 工作原理
@@ -57,18 +70,20 @@ curl -fsSL https://raw.githubusercontent.com/SteveZMTstudios/arcvm-kernelsu/main
    - `/init.real` = switchroot，挂载 Android root 后执行真正的 `/init`
 4. 每次开机都会重新加载，因此升级/更新都不会丢失。
 
-`vmlinux` 与设备的 ARCVM 内核 release 强绑定，不存在跨版本通用包。
+`vmlinux` 与 KMI 绑定：`5.10` 的产物适用于所有 `5.10.x` ARCVM，换大版本（如 `6.1`）才需要重新构建。
 
 ## 支持情况
 
 | 架构 | 内核 | 状态 |
 |---|---|---|
-| x86_64 | 5.10.252-1009564-ged76cab4c76e | 真机跑过，没问题 |
-| arm64 | 5.10.x ARCVM | 脚本能跑，但我没真机测过 |
+| x86_64 | 5.10.x ARCVM | 真机跑过，没问题 |
+| arm64 | 5.10.x ARCVM | CI 构建通过，QEMU 启动通过，未上真机 |
 
 ## 自己构建
 
-CI（GitHub Actions）会按 `kernel_version` + 架构的矩阵来构建，配置在 `.github/workflows/build.yml`。想本地跑的话：
+CI（GitHub Actions）按架构矩阵构建，配置在 `.github/workflows/build.yml`。`kernel_version` 可以不填：留空时跟随 `chromeos-5.10-arcvm` 分支 tip，版本从源码 `Makefile` 读。填 commit（如 `ed76cab4c76e`）或完整 release（如 `5.10.252-1009564-ged76cab4c76e`）则固定源码。
+
+想本地跑的话：
 
 ```sh
 ./scripts/build-arcvm-kernelsu-vmlinux.sh \
@@ -91,14 +106,11 @@ CI（GitHub Actions）会按 `kernel_version` + 架构的矩阵来构建，配�
 ## 目录
 
 ```
-get.sh                              # 一行安装入口（下载脚本并执行）
+install.sh                          # 单文件安装器（抓取 + 安装 + 恢复）
 scripts/
   build-arcvm-kernelsu-vmlinux.sh   # 构建 vmlinux
   build-arcvm-kernelsu-ko.sh        # 构建 KernelSU LKM + ksuinit
   patch_android.sh                  # ARCVM 平台适配
-  install-arcvm-kernelsu.sh         # 设备端安装/恢复
-  install-arcvm-kernelsu-brunch.sh  # 持久化安装（写入 Brunch bootscripts）
-  fetch-arcvm-kernelsu.sh           # 按内核版本抓取并安装
   stock_meta.py                     # CI 用来读 stock-vmlinux.json
 host/
   power_tune.sh                     # 性能模式切换：balanced / eco / performance

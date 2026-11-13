@@ -25,7 +25,7 @@
 #   ./build-arcvm-kernelsu-ko.sh --kernel-src /tmp/ckernel --ksu-src /tmp/KernelSU ...
 #
 # 之后在 ChromeOS 上：
-#   sudo bash install-arcvm-kernelsu.sh --ko-file kernelsu-5.10.252-x86_64.ko
+#   sudo bash install.sh --kernel-file vmlinux-5.10-x86_64
 
 set -eu
 set -o pipefail
@@ -363,6 +363,6 @@ info "KernelSU: $KSU_TAG（模块版本见 QEMU/管理器）"
 if [ "${KSU_VMLINUX_MODE:-0}" = "0" ]; then
     echo
     info "在 ChromeOS 上安装（system.raw.img 注入方式，可选）:"
-    printf '  sudo bash install-arcvm-kernelsu-image.sh --ko-file %s --ksuinit %s\n' "$OUTFILE" "$KSUINIT_OUT"
+    printf '  sudo bash install.sh --kernel-file %s\n' "$OUTFILE"
 fi
 warn "ChromeOS/ARCVM 内核更新后，请用新的 vmlinux 重新运行本脚本。"

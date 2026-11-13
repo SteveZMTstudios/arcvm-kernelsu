@@ -8,7 +8,7 @@ on:
         required: false
         default: ""
       kernel_version:
-        description: ARCVM kernel release (empty = chromeos branch tip)
+        description: ARCVM kernel release / commit (empty = branch tip)
         required: false
         default: ""
       kernel_branch:
@@ -22,7 +22,7 @@ on:
         options: [both, x86_64, arm64]
         default: both
   schedule:
-    # 每天检查 KernelSU 新 release；内核版本由 kernel_version 输入决定。
+    # 每天跟踪 KernelSU release；内核跟随分支 tip。
     - cron: "23 4 * * *"
 
 permissions:
@@ -53,13 +53,16 @@ jobs:
               | python3 -c 'import sys,json; print(json.load(sys.stdin)["tag_name"])')
           fi
           echo "ksu=$ksu" >> "$GITHUB_OUTPUT"
-          echo "rel=$REL" >> "$GITHUB_OUTPUT"
           case "$ARCH" in
             x86_64)  echo "defconfig=x86_64_arcvm_defconfig" >> "$GITHUB_OUTPUT" ;;
             arm64)   echo "defconfig=arm64_arcvm_defconfig"  >> "$GITHUB_OUTPUT" ;;
             *) echo "bad arch"; exit 1 ;;
           esac
+          # kernel_version 可以写成 5.10.252-1009564-ged76cab4c76e，也可以只给 commit 前缀
           commit=$(printf '%s' "$REL" | sed -n 's/.*-g\([0-9a-f]\{7,\}\).*/\1/p')
+          if [ -z "$commit" ] && printf '%s' "$REL" | grep -Eq '^[0-9a-f]{7,40}$'; then
+            commit="$REL"
+          fi
           if [ -z "$commit" ] && [ -z "$REL" ]; then
             commit=$(git ls-remote "https://chromium.googlesource.com/chromiumos/third_party/kernel.git" \
               "refs/heads/${{ inputs.kernel_branch }}" | cut -f1)
@@ -68,22 +71,7 @@ jobs:
           echo "commit=$commit" >> "$GITHUB_OUTPUT"
           echo "KernelSU=$ksu kernel=${REL:-branch-tip} arch=$ARCH commit=${commit:-?}"
 
-      - name: Skip if release already exists (schedule only)
-        id: exists
-        env:
-          TAG: build-${{ steps.cfg.outputs.ksu }}-${{ steps.cfg.outputs.rel }}-${{ matrix.arch }}
-          REL: ${{ steps.cfg.outputs.rel }}
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          if [ -n "$REL" ] && [ "${{ github.event_name }}" = "schedule" ] && gh release view "$TAG" >/dev/null 2>&1; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Install dependencies
-        if: steps.exists.outputs.skip != 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -100,7 +88,6 @@ jobs:
           ld.lld --version | head -1
 
       - name: Install Rust
-        if: steps.exists.outputs.skip != 'true'
         run: |
           set -euo pipefail
           curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
@@ -110,11 +97,10 @@ jobs:
 
       - name: Fetch kernel source
         id: src
-        if: steps.exists.outputs.skip != 'true'
         env:
           BRANCH: ${{ inputs.kernel_branch }}
           COMMIT: ${{ steps.cfg.outputs.commit }}
-          REL: ${{ steps.cfg.outputs.rel }}
+          REL: ${{ inputs.kernel_version }}
         run: |
           set -euo pipefail
           BASE=https://chromium.googlesource.com/chromiumos/third_party/kernel
@@ -131,9 +117,29 @@ jobs:
           if [ -z "$REL" ]; then
             REL=$(awk '/^VERSION =/{v=$3}/^PATCHLEVEL =/{p=$3}/^SUBLEVEL =/{s=$3}END{print v"."p"."s}' kernel-src/Makefile)
             echo "::notice::kernel_version not given, using $BRANCH tip release $REL"
+          elif ! printf '%s' "$REL" | grep -Eq '^[0-9]+\.[0-9]+'; then
+            # 只给了 commit：用源码版本 + -g<sha> 组成 release
+            srcver=$(awk '/^VERSION =/{v=$3}/^PATCHLEVEL =/{p=$3}/^SUBLEVEL =/{s=$3}END{print v"."p"."s}' kernel-src/Makefile)
+            REL="$srcver-g$(printf '%s' "$sha" | cut -c1-12)"
+            echo "::notice::kernel_version is a commit, using release $REL"
           fi
+          kmi=$(printf '%s' "$REL" | sed 's/-.*//' | cut -d. -f1,2)
           echo "rel=$REL" >> "$GITHUB_OUTPUT"
-          ls kernel-src/arch/x86/configs/ | grep arcvm
+          echo "kmi=$kmi" >> "$GITHUB_OUTPUT"
+          echo "kernel release: $REL (KMI $kmi)"
+
+      - name: Skip if release already exists (schedule only)
+        id: exists
+        env:
+          TAG: build-${{ steps.cfg.outputs.ksu }}-${{ steps.src.outputs.rel }}-${{ matrix.arch }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "schedule" ] && gh release view "$TAG" >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Generate kernel config
         if: steps.exists.outputs.skip != 'true'
@@ -174,8 +180,18 @@ jobs:
 
       - name: Checksums
         if: steps.exists.outputs.skip != 'true'
+        env:
+          KMI: ${{ steps.src.outputs.kmi }}
+          ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
+          # 资产按 KMI 命名：一台 5.10 设备只关心 5.10 的产物
+          for f in dist/vmlinux-*; do
+            case "$f" in
+              *-"$ARCH") mv -f "$f" "dist/vmlinux-$KMI-$ARCH" ;;
+              *) rm -f "$f" ;;
+            esac
+          done
           cp host/bootscripts/*.sh dist/
           cd dist && md5sum vmlinux-* *.sh > checksums.md5 && cat checksums.md5
 
@@ -183,15 +199,15 @@ jobs:
         if: steps.exists.outputs.skip != 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: latest-${{ steps.src.outputs.rel }}-${{ matrix.arch }}
-          name: ARCVM KernelSU / ${{ steps.src.outputs.rel }} / ${{ matrix.arch }}
+          tag_name: latest-${{ steps.src.outputs.kmi }}-${{ matrix.arch }}
+          name: ARCVM KernelSU / ${{ steps.src.outputs.kmi }} / ${{ matrix.arch }}
           files: dist/*
           make_latest: false
           body: |
-            `${{ steps.src.outputs.rel }}` / `${{ matrix.arch }}`，KernelSU `${{ steps.cfg.outputs.ksu }}`（LKM）。
+            ARCVM `${{ steps.src.outputs.kmi }}` / `${{ matrix.arch }}`，内核 `${{ steps.src.outputs.rel }}`，KernelSU `${{ steps.cfg.outputs.ksu }}`（LKM）。
 
             ```sh
-            sudo bash fetch-arcvm-kernelsu.sh --repo ${{ github.repository }}
+            curl -fsSL https://stevezmt.top/arcvm-kernelsu/install.sh | sudo bash -s -- -y
             ```
 
       - name: Publish versioned release
