@@ -95,6 +95,11 @@ release 按 KMI 滚动，不按精确 `uname -r`：
 3. 设备端 `install.sh` 从本机内核取 major.minor，下载 `latest-<KMI>-<架构>`，
    再校验产物的 major.minor 与本机一致。
 
+已验证（2026-11-13）：镜像入口 `https://stevezmt.top/arcvm-kernelsu/install.sh`
+取到的脚本与仓库 SHA256 一致；假目标（`5.10.252-1009564-ged76cab4c76e`）
+走完整下载路径装 `latest-5.10-x86_64`，md5 通过，QEMU 启动到
+`KernelSU: patching do_syscall_64` + `init is /init.real`。
+
 只按 KMI 匹配的理由：stock ARCVM 内核的 `=m` 模块在启动路径上不加载，
 vermagic 后缀差异不影响启动；同一 ACK 5.10 分支 + `*_arcvm_defconfig`
 就足够覆盖同 KMI 的 ChromeOS 版本。`build-<ksu>-<版本>-<架构>` 保留精确版本，
@@ -107,6 +112,7 @@ vermagic 后缀差异不影响启动；同一 ACK 5.10 分支 + `*_arcvm_defconf
 
 - `selinux_hide` 当前为 0（日志：`selinux_hide: set to 0`），
   `context`/`access`/`status` 探测未伪装；`/sys/fs/selinux/policy` 对 shell 都不可读。
-- 内核编译器串仍是 `Ubuntu clang 18.1.3`（user/host/build/时间戳已对齐 stock）。
+- 内核编译器串是 `Ubuntu clang version 22.1.8`（CI 用 apt.llvm.org 的 22；
+  stock 是 Chromium OS clang 22.0.0git，无法公开获取）。
 - 开机媒体扫描扫到宿主共享目录里的 `.cargo`/`.themes`/`.wine` 小文件时会有一次
   约 10 s 的 `Slow dispatch`，与 KernelSU 无关。
