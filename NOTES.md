@@ -114,6 +114,20 @@ release 按 KMI 滚动，不按精确 `uname -r`：
 `kernel/stock-vmlinux.json` 仍保留，用于“要 100% 复刻 stock config”的可选本地
 构建路径（`build-arcvm-kernelsu-vmlinux.sh --vmlinux ...`）。
 
+## 主机节电策略
+
+`power-tune.sh` 是独立单文件，不参与 KernelSU 的安装/恢复链路。实测
+（Ryzen 7 8840U，8 核满载 RAPL package power）：
+
+| 配置 | package power |
+|---|---|
+| boost=1 | ~28 W |
+| boost=0 | ~12.4 W |
+| boost=0 + max=3.2 GHz | ~11.7 W |
+| boost=0 之后改 EPP | 几乎没有额外收益 |
+
+所以 balanced 只关 boost、不动频率上限；eco 才额外压 max。
+
 ## 已知遗留
 
 - `selinux_hide` 当前为 0（日志：`selinux_hide: set to 0`），
