@@ -107,7 +107,6 @@ CI（GitHub Actions）按架构矩阵构建，配置在 `.github/workflows/build
 
 ```
 install.sh                          # 单文件安装器（抓取 + 安装 + 恢复）
-power-tune.sh                       # 单文件节电策略安装器（独立于 KernelSU）
 scripts/
   build-arcvm-kernelsu-vmlinux.sh   # 构建 vmlinux
   build-arcvm-kernelsu-ko.sh        # 构建 KernelSU LKM + ksuinit
@@ -120,17 +119,6 @@ kernel/
   stock-vmlinux.json                # 可选：按内核版本索引 stock vmlinux
 .github/workflows/build.yml         # CI 构建与发版
 NOTES.md                            # 实测数据与踩坑记录
-```
-
-## 附：主机节电策略（独立）
-
-和 KernelSU 无关，单独一个文件，装了也不影响内核安装；卸载只动它自己写的东西。
-
-```sh
-curl -fsSL https://stevezmt.top/arcvm-kernelsu/power-tune.sh | sudo bash -s -- -y
-curl -fsSL https://stevezmt.top/arcvm-kernelsu/power-tune.sh | sudo bash -s -- -y --profile eco
-sudo bash power-tune.sh --status
-sudo bash power-tune.sh --uninstall
 ```
 
 ## 恢复与安全
