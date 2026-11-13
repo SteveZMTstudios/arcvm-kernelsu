@@ -100,10 +100,16 @@ release 按 KMI 滚动，不按精确 `uname -r`：
 走完整下载路径装 `latest-5.10-x86_64`，md5 通过，QEMU 启动到
 `KernelSU: patching do_syscall_64` + `init is /init.real`。
 
-只按 KMI 匹配的理由：stock ARCVM 内核的 `=m` 模块在启动路径上不加载，
-vermagic 后缀差异不影响启动；同一 ACK 5.10 分支 + `*_arcvm_defconfig`
-就足够覆盖同 KMI 的 ChromeOS 版本。`build-<ksu>-<版本>-<架构>` 保留精确版本，
-需要逐字节复刻时用 `--release-tag` 指定。
+只按 KMI 匹配的理由：
+
+- GKI 的前提就是同一 KMI 内 ABI 冻结，sublevel 升降（`5.10.252` ↔ `5.10.269`）
+  不改变导出符号和结构布局；
+- 我们替换的是整颗内核，`kernelsu.ko` 由同一棵树、同一份 config 编译并内嵌进
+  initramfs，vermagic 与内核天然自洽，不存在“模块对着别的内核编译”的问题；
+- stock ARCVM 内核的 `=m` 模块在启动路径上不加载，换内核不会因模块缺失起不来；
+- 同一 ACK 5.10 分支 + `*_arcvm_defconfig` 足以覆盖同 KMI 的 ChromeOS 版本。
+
+`build-<ksu>-<版本>-<架构>` 保留精确版本，需要逐字节复刻时用 `--release-tag` 指定。
 
 `kernel/stock-vmlinux.json` 仍保留，用于“要 100% 复刻 stock config”的可选本地
 构建路径（`build-arcvm-kernelsu-vmlinux.sh --vmlinux ...`）。
