@@ -1,4 +1,4 @@
-# NOTES — ARCVM KernelSU 实现记录
+# NOTES
 
 ## 最终形态
 
@@ -17,7 +17,7 @@
 
 ## 两个关键根因（实测）
 
-### 1. 5–7 秒全系统卡顿
+### 1. 5–7 秒全系统卡顿 - 解决
 
 `dmesg` 在 225 秒里出现 2341 条 `tp_marker: mark process` + 2183 条
 `unmark process`；同样时间窗内 `system_server` 的 main looper 出现
@@ -28,7 +28,7 @@ printk，这就是根因。
 修复后（`pr_debug`）：`tp_marker` 0 条，`Slow dispatch` 最大 162 ms
 （开机媒体扫描另有一次 10 s，来自 `ModernMediaScanner` 扫描宿主共享目录）。
 
-### 2. `su` 完全不工作
+### 2. `su` 完全不工作 - 解决
 
 症状：`ls /system/bin/su` → ENOENT，`test -e` → rc=1，`su -c id` → not found。
 不是 allowlist、也不是 erofs：内核在 `execve` 里把 `/system/bin/su` 换成
