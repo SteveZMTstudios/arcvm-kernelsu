@@ -243,8 +243,7 @@ if $RESTORE; then
         info "移除 KSU bootscript..."
         rm -f "$BOOTSCRIPTS/20-ksu-vmlinux.sh"
         if $PURGE; then
-            info "移除电源 bootscript 与 stateful KSU 文件..."
-            rm -f "$BOOTSCRIPTS/10-power-tune.sh"
+            info "移除 stateful KSU 文件..."
             rm -f "$KSU_DIR/vmlinux" "$KSU_DIR/meta" "$KSU_DIR/boot.log"
         fi
     fi
@@ -305,7 +304,7 @@ else
     KSU_KERNEL="$TMP/$ASSET"
 
     if $PERSISTENT; then
-        for f in 10-power-tune.sh 20-ksu-vmlinux.sh; do
+        for f in 20-ksu-vmlinux.sh; do
             fetch_asset "$f" "$TMP/$f" "$TAG" || die "下载失败: $TAG/$f"
             want=$(expected_md5 "$f" "$TMP/checksums.md5")
             if [ -n "$want" ]; then
@@ -350,18 +349,17 @@ ksu_md5=$KSU_MD5
 ksu_kmi=$(kmi_of "$KSU_VER")
 EOF
 
-    info "安装 Brunch bootscripts..."
+    info "安装 Brunch bootscript..."
     BSDIR=$TMP
     if [ ! -f "$BSDIR/20-ksu-vmlinux.sh" ]; then
         for d in "$(dirname "$0")" "$(dirname "$0")/host/bootscripts" "$PWD/host/bootscripts"; do
-            if [ -f "$d/20-ksu-vmlinux.sh" ] && [ -f "$d/10-power-tune.sh" ]; then
+            if [ -f "$d/20-ksu-vmlinux.sh" ]; then
                 BSDIR=$d
                 break
             fi
         done
     fi
-    [ -f "$BSDIR/20-ksu-vmlinux.sh" ] || die "找不到 bootscripts（--persistent 需要 release 资产或仓库 host/bootscripts）。"
-    install -m 0755 "$BSDIR/10-power-tune.sh" "$BOOTSCRIPTS/10-power-tune.sh"
+    [ -f "$BSDIR/20-ksu-vmlinux.sh" ] || die "找不到 bootscript（--persistent 需要 release 资产或仓库 host/bootscripts）。"
     install -m 0755 "$BSDIR/20-ksu-vmlinux.sh" "$BOOTSCRIPTS/20-ksu-vmlinux.sh"
 fi
 
@@ -370,7 +368,7 @@ install_kernel "$KSU_KERNEL"
 if $PERSISTENT; then
     ok "持久化安装完成。"
     info "stateful: $KSU_DIR/vmlinux"
-    info "bootscripts: $BOOTSCRIPTS/10-power-tune.sh, 20-ksu-vmlinux.sh"
+    info "bootscript: $BOOTSCRIPTS/20-ksu-vmlinux.sh"
     warn "ChromeOS 更新后由 bootscript 自动重放（KMI 变化时跳过）。"
 fi
 info "备份: $BACKUP"

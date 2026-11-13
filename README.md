@@ -113,8 +113,6 @@ scripts/
   patch_android.sh                  # ARCVM 平台适配
   stock_meta.py                     # CI 用来读 stock-vmlinux.json
 host/
-  power_tune.sh                     # 性能模式切换：balanced / eco / performance
-  bootscripts/10-power-tune.sh      # 开机锁定 boost=0 和 EPP
   bootscripts/20-ksu-vmlinux.sh     # 可选：开机自动跟随 KSU 版本
 kernel/
   arcvm-fragment.config             # CI 做 source-only 构建时补上的 config
