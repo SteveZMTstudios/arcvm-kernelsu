@@ -81,16 +81,17 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            clang lld llvm llvm-dev flex bison bc python3 curl tar gzip git \
-            make gcc libssl-dev libelf-dev gcc-aarch64-linux-gnu rsync
-          for t in clang clang++ llvm-ar llvm-strip llvm-nm ld.lld; do
-            for v in 18 19 17; do
-              if [ -x "/usr/bin/${t}-${v}" ]; then
-                sudo ln -sf "/usr/bin/${t}-${v}" "/usr/local/bin/${t}"
-                break
-              fi
-            done
+            flex bison bc python3 curl tar gzip git rsync \
+            make gcc libssl-dev libelf-dev gcc-aarch64-linux-gnu \
+            lsb-release wget software-properties-common ca-certificates
+          # stock ARCVM 内核用的是 Chromium OS clang 22.0.0git / LLD 22.0.0
+          wget -qO /tmp/llvm.sh https://apt.llvm.org/llvm.sh
+          sudo bash /tmp/llvm.sh 22
+          for t in clang clang++ llvm-ar llvm-strip llvm-nm llvm-objcopy llvm-objdump llvm-readelf ld.lld; do
+            sudo ln -sf "/usr/bin/${t}-22" "/usr/local/bin/${t}"
           done
+          clang --version | head -1
+          ld.lld --version | head -1
 
       - name: Install Rust
         if: steps.exists.outputs.skip != 'true'
