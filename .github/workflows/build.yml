@@ -196,7 +196,8 @@ jobs:
           cd dist && md5sum vmlinux-* *.sh > checksums.md5 && cat checksums.md5
 
       - name: Publish rolling release
-        if: steps.exists.outputs.skip != 'true'
+        # 定时任务只产出不可变 build-*，latest-* 只由人工 dispatch 提升，避免每天把未验证的 tip 推给用户
+        if: steps.exists.outputs.skip != 'true' && github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest-${{ steps.src.outputs.kmi }}-${{ matrix.arch }}
