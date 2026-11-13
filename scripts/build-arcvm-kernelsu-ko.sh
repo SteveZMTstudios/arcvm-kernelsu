@@ -28,6 +28,7 @@
 #   sudo bash install-arcvm-kernelsu.sh --ko-file kernelsu-5.10.252-x86_64.ko
 
 set -eu
+set -o pipefail
 
 RED=$'\e[1;31m'
 YELLOW=$'\e[1;33m'
@@ -284,21 +285,21 @@ cd "$KSRC"
 # 空 .scmversion 让 setlocalversion 直接返回空。
 : > "$KSRC/.scmversion"
 cp "$CONFIG" .config
-make LLVM=1 ARCH="$ARCH" olddefconfig >"$WORK/prepare.log" 2>&1
+make LLVM=1 ARCH="$ARCH" olddefconfig 2>&1 | tee -a "$WORK/prepare.log"
 # 让模块的 vermagic 与目标内核完全一致（包括 -1009564-g... 后缀）
 if [ -x "$KSRC/scripts/config" ]; then
     "$KSRC/scripts/config" --file "$KSRC/.config" --set-str LOCALVERSION "$LOCALVERSION_SUFFIX"
     "$KSRC/scripts/config" --file "$KSRC/.config" --disable LOCALVERSION_AUTO
-    make LLVM=1 ARCH="$ARCH" olddefconfig >>"$WORK/prepare.log" 2>&1
+    make LLVM=1 ARCH="$ARCH" olddefconfig 2>&1 | tee -a "$WORK/prepare.log"
 fi
-make LLVM=1 ARCH="$ARCH" modules_prepare >>"$WORK/prepare.log" 2>&1
+make LLVM=1 ARCH="$ARCH" modules_prepare 2>&1 | tee -a "$WORK/prepare.log"
 # 生成 security/selinux/flask.h
-make LLVM=1 ARCH="$ARCH" security/selinux/ >>"$WORK/prepare.log" 2>&1
+make LLVM=1 ARCH="$ARCH" security/selinux/ 2>&1 | tee -a "$WORK/prepare.log"
 
 info "编译 KernelSU LKM..."
 KSU_MAKE_ARGS=(CONFIG_KSU=m)
 [ "$ARCH" = "x86_64" ] && KSU_MAKE_ARGS+=(CONFIG_KSU_X86_PATCH_SYSCALL_DISPATCHER=y)
-make LLVM=1 ARCH="$ARCH" M="$KSUSRC/kernel" "${KSU_MAKE_ARGS[@]}" modules >"$WORK/build.log" 2>&1 || {
+make LLVM=1 ARCH="$ARCH" M="$KSUSRC/kernel" "${KSU_MAKE_ARGS[@]}" modules 2>&1 | tee "$WORK/build.log" || {
     tail -40 "$WORK/build.log" >&2
     die "KernelSU 模块编译失败。"
 }
@@ -329,11 +330,11 @@ case "$ARCH" in
     *) die "不支持的 Rust 目标架构: $ARCH" ;;
 esac
 RUST_TARGET="${RUST_ARCH}-unknown-linux-musl"
-rustup target add "$RUST_TARGET" >"$WORK/rust-target.log" 2>&1 || {
+rustup target add "$RUST_TARGET" 2>&1 | tee "$WORK/rust-target.log" || {
     tail -20 "$WORK/rust-target.log" >&2
     die "无法安装 Rust target: $RUST_TARGET"
 }
-(cd "$KSUSRC" && cargo build --release --target "$RUST_TARGET" -p ksuinit) >"$WORK/ksuinit-build.log" 2>&1 || {
+(cd "$KSUSRC" && cargo build --release --target "$RUST_TARGET" -p ksuinit) 2>&1 | tee "$WORK/ksuinit-build.log" || {
     tail -40 "$WORK/ksuinit-build.log" >&2
     die "ksuinit 编译失败。"
 }

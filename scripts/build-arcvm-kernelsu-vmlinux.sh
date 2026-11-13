@@ -23,6 +23,7 @@
 #   ./build-arcvm-kernelsu-vmlinux.sh --vmlinux vmlinux.original -j 16
 
 set -eu
+set -o pipefail
 
 RED=$'\e[1;31m'
 YELLOW=$'\e[1;33m'
@@ -323,7 +324,7 @@ if [ -n "$FW" ]; then
     "$KSRC/scripts/config" --file "$CONFIG" --set-str EXTRA_FIRMWARE_DIR "$FWDIR"
 fi
 
-make LLVM=1 ARCH="$ARCH" olddefconfig >"$WORK/kbuild-config.log" 2>&1
+make LLVM=1 ARCH="$ARCH" olddefconfig 2>&1 | tee "$WORK/kbuild-config.log"
 
 KSU_CFG=$(sed -n 's/^CONFIG_KSU=\([ym]\)$/\1/p' "$CONFIG" | head -n1 || true)
 if [ "$KSU_MODE" = "builtin" ]; then
@@ -343,7 +344,7 @@ KBUILD_BUILD_USER=${KBUILD_BUILD_USER:-cros-kernel} \
 KBUILD_BUILD_HOST=${KBUILD_BUILD_HOST:-chromium.org} \
 KBUILD_BUILD_VERSION=${KBUILD_BUILD_VERSION:-1} \
 KBUILD_BUILD_TIMESTAMP=${KBUILD_BUILD_TIMESTAMP:-"Wed, 21 Oct 2026 19:12:41 -0700"} \
-make LLVM=1 ARCH="$ARCH" -j"$JOBS" "$PKG" >"$WORK/kbuild.log" 2>&1 || {
+make LLVM=1 ARCH="$ARCH" -j"$JOBS" "$PKG" 2>&1 | tee "$WORK/kbuild.log" || {
     tail -60 "$WORK/kbuild.log" >&2
     die "内核编译失败。"
 }
