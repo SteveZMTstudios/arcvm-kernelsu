@@ -35,7 +35,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: ${{ (github.event_name == 'workflow_dispatch' && inputs.arch != 'both') && fromJSON(format('["{0}"]', inputs.arch)) || fromJSON('["x86_64","arm64"]') }}
+        arch: [x86_64, arm64]
+    # workflow_dispatch 选单一架构时，另一个矩阵项跳过
+    if: github.event_name != 'workflow_dispatch' || inputs.arch == 'both' || inputs.arch == matrix.arch
     steps:
       - uses: actions/checkout@v4
 
