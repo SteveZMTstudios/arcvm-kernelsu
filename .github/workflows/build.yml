@@ -8,9 +8,9 @@ on:
         required: false
         default: ""
       kernel_version:
-        description: ARCVM kernel release (uname -r of the device)
-        required: true
-        default: 5.10.252-1009564-ged76cab4c76e
+        description: ARCVM kernel release (empty = chromeos branch tip)
+        required: false
+        default: ""
       kernel_branch:
         description: ChromeOS kernel branch
         required: true
@@ -60,17 +60,23 @@ jobs:
             *) echo "bad arch"; exit 1 ;;
           esac
           commit=$(printf '%s' "$REL" | sed -n 's/.*-g\([0-9a-f]\{7,\}\).*/\1/p')
+          if [ -z "$commit" ] && [ -z "$REL" ]; then
+            commit=$(git ls-remote "https://chromium.googlesource.com/chromiumos/third_party/kernel.git" \
+              "refs/heads/${{ inputs.kernel_branch }}" | cut -f1)
+            echo "::notice::kernel_version empty, using ${{ inputs.kernel_branch }} tip $commit"
+          fi
           echo "commit=$commit" >> "$GITHUB_OUTPUT"
-          echo "KernelSU=$ksu kernel=$REL arch=$ARCH commit=${commit:-tip}"
+          echo "KernelSU=$ksu kernel=${REL:-branch-tip} arch=$ARCH commit=${commit:-?}"
 
       - name: Skip if release already exists (schedule only)
         id: exists
         env:
           TAG: build-${{ steps.cfg.outputs.ksu }}-${{ steps.cfg.outputs.rel }}-${{ matrix.arch }}
+          REL: ${{ steps.cfg.outputs.rel }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          if [ "${{ github.event_name }}" = "schedule" ] && gh release view "$TAG" >/dev/null 2>&1; then
+          if [ -n "$REL" ] && [ "${{ github.event_name }}" = "schedule" ] && gh release view "$TAG" >/dev/null 2>&1; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
@@ -103,10 +109,12 @@ jobs:
           "$HOME/.cargo/bin/rustup" target add x86_64-unknown-linux-musl aarch64-unknown-linux-musl || true
 
       - name: Fetch kernel source
+        id: src
         if: steps.exists.outputs.skip != 'true'
         env:
           BRANCH: ${{ inputs.kernel_branch }}
           COMMIT: ${{ steps.cfg.outputs.commit }}
+          REL: ${{ steps.cfg.outputs.rel }}
         run: |
           set -euo pipefail
           BASE=https://chromium.googlesource.com/chromiumos/third_party/kernel
@@ -120,6 +128,11 @@ jobs:
           curl -fsSL --retry 3 -o kernel.tar.gz "$BASE/+archive/$sha.tar.gz"
           mkdir -p kernel-src
           tar -xzf kernel.tar.gz -C kernel-src
+          if [ -z "$REL" ]; then
+            REL=$(awk '/^VERSION =/{v=$3}/^PATCHLEVEL =/{p=$3}/^SUBLEVEL =/{s=$3}END{print v"."p"."s}' kernel-src/Makefile)
+            echo "::notice::kernel_version not given, using $BRANCH tip release $REL"
+          fi
+          echo "rel=$REL" >> "$GITHUB_OUTPUT"
           ls kernel-src/arch/x86/configs/ | grep arcvm
 
       - name: Generate kernel config
@@ -144,7 +157,7 @@ jobs:
         env:
           KSU_TAG: ${{ steps.cfg.outputs.ksu }}
           ARCH: ${{ matrix.arch }}
-          REL: ${{ steps.cfg.outputs.rel }}
+          REL: ${{ steps.src.outputs.rel }}
           KSU_MODE: lkm
         run: |
           set -euo pipefail
@@ -170,12 +183,12 @@ jobs:
         if: steps.exists.outputs.skip != 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: latest-${{ steps.cfg.outputs.rel }}-${{ matrix.arch }}
-          name: ARCVM KernelSU / ${{ steps.cfg.outputs.rel }} / ${{ matrix.arch }}
+          tag_name: latest-${{ steps.src.outputs.rel }}-${{ matrix.arch }}
+          name: ARCVM KernelSU / ${{ steps.src.outputs.rel }} / ${{ matrix.arch }}
           files: dist/*
           make_latest: false
           body: |
-            `${{ steps.cfg.outputs.rel }}` / `${{ matrix.arch }}`，KernelSU `${{ steps.cfg.outputs.ksu }}`（LKM）。
+            `${{ steps.src.outputs.rel }}` / `${{ matrix.arch }}`，KernelSU `${{ steps.cfg.outputs.ksu }}`（LKM）。
 
             ```sh
             sudo bash fetch-arcvm-kernelsu.sh --repo ${{ github.repository }}
@@ -185,7 +198,7 @@ jobs:
         if: steps.exists.outputs.skip != 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: build-${{ steps.cfg.outputs.ksu }}-${{ steps.cfg.outputs.rel }}-${{ matrix.arch }}
-          name: KernelSU ${{ steps.cfg.outputs.ksu }} / ${{ steps.cfg.outputs.rel }} / ${{ matrix.arch }}
+          tag_name: build-${{ steps.cfg.outputs.ksu }}-${{ steps.src.outputs.rel }}-${{ matrix.arch }}
+          name: KernelSU ${{ steps.cfg.outputs.ksu }} / ${{ steps.src.outputs.rel }} / ${{ matrix.arch }}
           files: dist/*
           make_latest: false

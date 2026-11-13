@@ -157,7 +157,9 @@ fi
 KBASE=${KVERSION%%-*}
 LOCALVERSION_SUFFIX=${KVERSION#"$KBASE"}
 KCOMMIT=$(printf '%s' "$KVERSION" | sed -n 's/.*-g\([0-9a-f]\{7,\}\).*/\1/p')
-[ -n "$KCOMMIT" ] || die "无法从 \"$KVERSION\" 解析 commit。"
+if [ -z "$KCOMMIT" ] && [ -z "$KERNEL_SRC" ]; then
+    die "无法从 \"$KVERSION\" 解析 commit；请用 --kernel-src 指定源码。"
+fi
 
 if [ -n "$ARCH_OVERRIDE" ]; then
     case "$ARCH_OVERRIDE" in
