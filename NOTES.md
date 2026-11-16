@@ -114,6 +114,18 @@ release 按 KMI 滚动，不按精确 `uname -r`：
 `kernel/stock-vmlinux.json` 仍保留，用于“要 100% 复刻 stock config”的可选本地
 构建路径（`build-arcvm-kernelsu-vmlinux.sh --vmlinux ...`）。
 
+## CI 触发方式
+
+| 触发 | 频率 | 行为 |
+|---|---|---|
+| `schedule` | 每月 1 日 | 跟随分支 tip 构建，只发不可变 `build-*` |
+| `workflow_dispatch` | 手动 | 可指定 `ksu_tag` / `kernel_version` / `arch`；发 `latest-*` + `build-*` |
+| `watch`（点 star） | 手动 | 仅仓库所有者有效；构建体检，产物走 artifact，不发版 |
+
+`schedule` / `watch` 没有 `inputs.*`，所以分支等默认值必须写在 `env` 里
+（`${{ inputs.kernel_branch || 'chromeos-5.10-arcvm' }}`）。之前直接引用
+`inputs.kernel_branch` 导致 `ls-remote` 拿到空 SHA、archive 404，定时任务连续失败。
+
 ## 已知遗留
 
 - `selinux_hide` 当前为 0（日志：`selinux_hide: set to 0`），
