@@ -22,14 +22,18 @@ on:
         options: [both, x86_64, arm64]
         default: both
   schedule:
-    # 每天跟踪 KernelSU release；内核跟随分支 tip。
-    - cron: "23 4 * * *"
+    # 每月 1 日检查一次 KernelSU release；内核跟随分支 tip。
+    - cron: "23 4 1 * *"
+  watch:
+    # 给仓库点 star 即触发一次构建体检（仅仓库所有者，不发版，产物走 artifact）
+    types: [started]
 
 permissions:
   contents: write
 
 jobs:
   build:
+    if: github.event_name != 'watch' || github.event.sender.login == github.repository_owner
     runs-on: ubuntu-24.04
     timeout-minutes: 300
     strategy:
@@ -44,6 +48,7 @@ jobs:
         env:
           IN_KSU: ${{ inputs.ksu_tag }}
           REL: ${{ inputs.kernel_version }}
+          BRANCH: ${{ inputs.kernel_branch || 'chromeos-5.10-arcvm' }}
           ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
@@ -65,11 +70,12 @@ jobs:
           fi
           if [ -z "$commit" ] && [ -z "$REL" ]; then
             commit=$(git ls-remote "https://chromium.googlesource.com/chromiumos/third_party/kernel.git" \
-              "refs/heads/${{ inputs.kernel_branch }}" | cut -f1)
-            echo "::notice::kernel_version empty, using ${{ inputs.kernel_branch }} tip $commit"
+              "refs/heads/$BRANCH" | cut -f1)
+            echo "::notice::kernel_version empty, using $BRANCH tip $commit"
           fi
+          [ -n "$commit" ] || { echo "::error::无法解析内核 commit（branch=$BRANCH）"; exit 1; }
           echo "commit=$commit" >> "$GITHUB_OUTPUT"
-          echo "KernelSU=$ksu kernel=${REL:-branch-tip} arch=$ARCH commit=${commit:-?}"
+          echo "KernelSU=$ksu kernel=${REL:-branch-tip} branch=$BRANCH arch=$ARCH commit=$commit"
 
       - name: Install dependencies
         run: |
@@ -98,7 +104,7 @@ jobs:
       - name: Fetch kernel source
         id: src
         env:
-          BRANCH: ${{ inputs.kernel_branch }}
+          BRANCH: ${{ inputs.kernel_branch || 'chromeos-5.10-arcvm' }}
           COMMIT: ${{ steps.cfg.outputs.commit }}
           REL: ${{ inputs.kernel_version }}
         run: |
@@ -110,7 +116,8 @@ jobs:
           else
             sha=$(git ls-remote "$BASE.git" "refs/heads/$BRANCH" | cut -f1)
           fi
-          echo "kernel commit: $sha"
+          echo "kernel commit: ${sha:-<empty>}"
+          [ -n "$sha" ] || { echo "::error::无法解析内核 commit（branch=$BRANCH）"; exit 1; }
           curl -fsSL --retry 3 -o kernel.tar.gz "$BASE/+archive/$sha.tar.gz"
           mkdir -p kernel-src
           tar -xzf kernel.tar.gz -C kernel-src
@@ -195,8 +202,16 @@ jobs:
           cp host/bootscripts/*.sh dist/
           cd dist && md5sum vmlinux-* *.sh > checksums.md5 && cat checksums.md5
 
+      - name: Upload artifacts (star check, no release)
+        if: steps.exists.outputs.skip != 'true' && github.event_name == 'watch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: arcvm-kernelsu-${{ steps.src.outputs.kmi }}-${{ matrix.arch }}
+          path: dist/*
+          retention-days: 7
+
       - name: Publish rolling release
-        # 定时任务只产出不可变 build-*，latest-* 只由人工 dispatch 提升，避免每天把未验证的 tip 推给用户
+        # 定时任务/星标检查只产出不可变 build-* 或 artifact，latest-* 只由人工 dispatch 提升
         if: steps.exists.outputs.skip != 'true' && github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
@@ -212,7 +227,7 @@ jobs:
             ```
 
       - name: Publish versioned release
-        if: steps.exists.outputs.skip != 'true'
+        if: steps.exists.outputs.skip != 'true' && github.event_name != 'watch'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ steps.cfg.outputs.ksu }}-${{ steps.src.outputs.rel }}-${{ matrix.arch }}
