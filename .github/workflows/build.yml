@@ -50,13 +50,26 @@ jobs:
           REL: ${{ inputs.kernel_version }}
           BRANCH: ${{ inputs.kernel_branch || 'chromeos-5.10-arcvm' }}
           ARCH: ${{ matrix.arch }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           ksu="$IN_KSU"
           if [ -z "$ksu" ]; then
-            ksu=$(curl -fsSL https://api.github.com/repos/tiann/KernelSU/releases/latest \
-              | python3 -c 'import sys,json; print(json.load(sys.stdin)["tag_name"])')
+            # 匿名调 api.github.com 会吃共享 IP 的 60/h 限流（403），必须带 token
+            if curl -fsSL --retry 3 -H "Authorization: Bearer $GH_TOKEN" \
+                 -H "X-GitHub-Api-Version: 2022-11-28" \
+                 -o "$RUNNER_TEMP/ksu.json" \
+                 https://api.github.com/repos/tiann/KernelSU/releases/latest; then
+              ksu=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["tag_name"])' "$RUNNER_TEMP/ksu.json")
+            fi
           fi
+          if [ -z "$ksu" ]; then
+            # API 不可用时退回 git tag
+            ksu=$(git ls-remote --tags --refs https://github.com/tiann/KernelSU.git \
+              | sed 's#.*refs/tags/##' | grep -E '^v[0-9]+\.[0-9]' | sort -V | tail -1 || true)
+            echo "::warning::api.github.com 不可用，回退到 KernelSU git tag: $ksu"
+          fi
+          [ -n "$ksu" ] || { echo "::error::无法确定 KernelSU 版本"; exit 1; }
           echo "ksu=$ksu" >> "$GITHUB_OUTPUT"
           case "$ARCH" in
             x86_64)  echo "defconfig=x86_64_arcvm_defconfig" >> "$GITHUB_OUTPUT" ;;
